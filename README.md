@@ -113,6 +113,32 @@ diagscope scan --project . --baseline --fail-on ERROR  # gate only new findings
 
 ---
 
+## Privacy and security
+
+DiagScope is designed to be safe to run on proprietary and company codebases.
+
+**Your code never leaves your machine.** DiagScope reads source files from the path you
+specify and writes results to a local output directory. It makes no network requests during
+analysis — there are no telemetry calls, no licence checks, no cloud backends.
+
+**Nothing is collected or transmitted.** DiagScope has no analytics, no crash reporting, and
+no update pings. It does not know you ran it, what project you analyzed, or what it found.
+
+**No code is executed or compiled.** The tool reads `.java` and `.kt` source files and reasons
+about their structure. It never invokes `javac`, runs your tests, or loads your application's
+classes. Your build system and runtime dependencies are not touched.
+
+**Results stay where you put them.** The output files (`report.md`, `report.html`,
+`result.json`) are written to your local filesystem. Nothing is uploaded or shared unless you
+choose to share them yourself.
+
+**You can verify this.** DiagScope is a self-contained JAR. Tools like
+[`Wireshark`](https://www.wireshark.org) or `sudo lsof -i -p <pid>` can confirm that no
+network connections are opened while it runs. The source is available to authorised team
+members on request.
+
+---
+
 ## Update
 
 ```bash
