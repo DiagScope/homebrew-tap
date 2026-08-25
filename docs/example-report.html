@@ -1,0 +1,696 @@
+<title>DiagScope</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ─── Tokens ─── */
+:root {
+  --bg:           #0d1117;
+  --surface:      #161b22;
+  --surface-2:    #21262d;
+  --border:       #30363d;
+  --text:         #e6edf3;
+  --text-muted:   #8b949e;
+  --text-subtle:  #6e7681;
+
+  --error:        #ff7b72;
+  --error-dim:    rgba(255, 123, 114, 0.12);
+  --error-stripe: #ff7b72;
+
+  --warning:      #e3b341;
+  --warning-dim:  rgba(227, 179, 65, 0.10);
+  --warning-stripe:#e3b341;
+
+  --info:         #79c0ff;
+  --info-dim:     rgba(121, 192, 255, 0.08);
+  --info-stripe:  #79c0ff;
+
+  --accent:       #58a6ff;
+  --code-bg:      #010409;
+  --radius:       8px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg:           #ffffff;
+    --surface:      #f6f8fa;
+    --surface-2:    #eaeef2;
+    --border:       #d0d7de;
+    --text:         #1f2328;
+    --text-muted:   #656d76;
+    --text-subtle:  #8c959f;
+
+    --error:        #cf222e;
+    --error-dim:    rgba(207, 34, 46, 0.08);
+    --error-stripe: #cf222e;
+
+    --warning:      #9a6700;
+    --warning-dim:  rgba(154, 103, 0, 0.07);
+    --warning-stripe:#d4a72c;
+
+    --info:         #0969da;
+    --info-dim:     rgba(9, 105, 218, 0.07);
+    --info-stripe:  #0969da;
+
+    --accent:       #0969da;
+    --code-bg:      #f6f8fa;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:           #0d1117;
+  --surface:      #161b22;
+  --surface-2:    #21262d;
+  --border:       #30363d;
+  --text:         #e6edf3;
+  --text-muted:   #8b949e;
+  --text-subtle:  #6e7681;
+  --error:        #ff7b72;
+  --error-dim:    rgba(255, 123, 114, 0.12);
+  --error-stripe: #ff7b72;
+  --warning:      #e3b341;
+  --warning-dim:  rgba(227, 179, 65, 0.10);
+  --warning-stripe:#e3b341;
+  --info:         #79c0ff;
+  --info-dim:     rgba(121, 192, 255, 0.08);
+  --info-stripe:  #79c0ff;
+  --accent:       #58a6ff;
+  --code-bg:      #010409;
+}
+
+/* ─── Reset ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+code, pre, .mono {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ─── Header ─── */
+.report-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+}
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0 12px;
+  flex-wrap: wrap;
+}
+.brand {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+.brand-slash {
+  color: var(--text-subtle);
+  font-weight: 400;
+}
+.project-name {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.header-meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+.meta-item { white-space: nowrap; }
+.meta-item strong { color: var(--text-muted); font-weight: 500; }
+
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-btn:hover { border-color: var(--text-subtle); color: var(--text); }
+.filter-btn.active { background: var(--surface-2); border-color: var(--text-subtle); color: var(--text); }
+.filter-btn.active.all { border-color: var(--accent); color: var(--accent); }
+.filter-btn.active.error-btn { border-color: var(--error); color: var(--error); background: var(--error-dim); }
+.filter-btn.active.warning-btn { border-color: var(--warning); color: var(--warning); background: var(--warning-dim); }
+.filter-btn.active.info-btn { border-color: var(--info); color: var(--info); background: var(--info-dim); }
+.dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.dot-error { background: var(--error); }
+.dot-warning { background: var(--warning); }
+.dot-info { background: var(--info); }
+.filter-count { font-variant-numeric: tabular-nums; }
+
+/* ─── Main ─── */
+.findings-list {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ─── Finding card ─── */
+.finding {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+}
+.finding[data-sev="error"]   { border-left: 3px solid var(--error-stripe); }
+.finding[data-sev="warning"] { border-left: 3px solid var(--warning-stripe); }
+.finding[data-sev="info"]    { border-left: 3px solid var(--info-stripe); }
+
+.finding-body { flex: 1; padding: 16px 20px; min-width: 0; }
+
+.finding-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.sev-pill {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.sev-pill.error   { background: var(--error-dim);   color: var(--error);   border: 1px solid var(--error-stripe); }
+.sev-pill.warning { background: var(--warning-dim); color: var(--warning); border: 1px solid var(--warning-stripe); }
+.sev-pill.info    { background: var(--info-dim);    color: var(--info);    border: 1px solid var(--info-stripe); }
+
+.rule-id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.2px;
+}
+.confidence {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+.file-loc {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.finding-message {
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+
+/* ─── Flow path ─── */
+.flow-block {
+  margin-bottom: 14px;
+}
+.flow-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  margin-bottom: 6px;
+}
+.flow-chain {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  overflow-x: auto;
+}
+.flow-step {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.flow-step.entrypoint {
+  color: var(--accent);
+  font-weight: 500;
+}
+.flow-step.issue {
+  color: var(--text);
+  font-weight: 500;
+}
+.flow-arrow {
+  color: var(--text-subtle);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+/* ─── Code block ─── */
+.code-wrap {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.code-header-bar {
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+.code-body {
+  background: var(--code-bg);
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+.code-body pre {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-muted);
+  margin: 0;
+  tab-size: 4;
+}
+/* Minimal syntax colouring — no external lib needed */
+.kw  { color: #ff7b72; }   /* keyword */
+.ty  { color: #ffa657; }   /* type     */
+.cm  { color: #8b949e; font-style: italic; } /* comment */
+.st  { color: #a5d6ff; }   /* string   */
+.an  { color: #d2a8ff; }   /* annotation */
+.hl  { background: rgba(255,123,114,.08); display: block; border-left: 2px solid var(--error); padding-left: 6px; margin-left: -8px; }
+.hl-warn { background: rgba(227,179,65,.08); display: block; border-left: 2px solid var(--warning); padding-left: 6px; margin-left: -8px; }
+
+/* Light theme syntax */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .kw { color: #cf222e; }
+  :root:not([data-theme="dark"]) .ty { color: #953800; }
+  :root:not([data-theme="dark"]) .cm { color: #8c959f; }
+  :root:not([data-theme="dark"]) .st { color: #0a3069; }
+  :root:not([data-theme="dark"]) .an { color: #8250df; }
+  :root:not([data-theme="dark"]) .code-body { background: var(--code-bg); }
+}
+:root[data-theme="dark"] .kw { color: #ff7b72; }
+:root[data-theme="dark"] .ty { color: #ffa657; }
+:root[data-theme="dark"] .cm { color: #8b949e; }
+:root[data-theme="dark"] .st { color: #a5d6ff; }
+:root[data-theme="dark"] .an { color: #d2a8ff; }
+
+/* ─── Fix section ─── */
+.fix-block {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.fix-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  margin-bottom: 5px;
+}
+.fix-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.fix-text code {
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ─── No-flow note ─── */
+.no-flow-note {
+  font-size: 12px;
+  color: var(--text-subtle);
+  font-style: italic;
+  margin-bottom: 14px;
+}
+
+/* ─── Footer ─── */
+footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 11px;
+  color: var(--text-subtle);
+  border-top: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ─── Hidden state ─── */
+.finding.hidden { display: none; }
+
+@media (max-width: 600px) {
+  .findings-list { padding: 16px 12px 48px; }
+  .report-header { padding: 0 16px; }
+  .header-meta { gap: 12px; }
+  .flow-chain { font-size: 11px; }
+}
+</style>
+
+<!-- ═══ HEADER ═══ -->
+<header class="report-header">
+  <div class="header-top">
+    <span class="brand">diag<span class="brand-slash">/</span>scope</span>
+    <span class="project-name">payment-service</span>
+    <div class="header-meta">
+      <span class="meta-item">25 Aug 2026</span>
+      <span class="meta-item"><strong>8</strong> files</span>
+      <span class="meta-item"><strong>47</strong> methods</span>
+      <span class="meta-item"><strong>6</strong> flows</span>
+      <span class="meta-item"><strong>312 ms</strong></span>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <button class="filter-btn active all" onclick="filter('all')">
+      All <span class="filter-count">6</span>
+    </button>
+    <button class="filter-btn error-btn" onclick="filter('error')">
+      <span class="dot dot-error"></span> Errors <span class="filter-count">2</span>
+    </button>
+    <button class="filter-btn warning-btn" onclick="filter('warning')">
+      <span class="dot dot-warning"></span> Warnings <span class="filter-count">3</span>
+    </button>
+    <button class="filter-btn info-btn" onclick="filter('info')">
+      <span class="dot dot-info"></span> Info <span class="filter-count">1</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══ FINDINGS ═══ -->
+<main class="findings-list">
+
+  <!-- 1 · SILENT_CATCH -->
+  <article class="finding" data-sev="error">
+    <div class="finding-body">
+      <div class="finding-header">
+        <span class="sev-pill error">Error</span>
+        <span class="rule-id mono">SILENT_CATCH</span>
+        <span class="file-loc mono">PaymentService.java:47</span>
+        <span class="confidence">HIGH confidence</span>
+      </div>
+      <p class="finding-message">
+        Exception caught and discarded without logging, rethrowing, or converting to a stable failure code.
+        If <code>ledger.debit()</code> fails in production, no trace will reach your logs or alerting pipeline.
+      </p>
+
+      <div class="flow-block">
+        <div class="flow-label">Flow path</div>
+        <div class="flow-chain">
+          <span class="flow-step entrypoint">POST /payments/{id}/capture</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">PaymentController.capture()</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step issue">PaymentService.process()</span>
+        </div>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-header-bar">PaymentService.java · lines 44–50</div>
+        <div class="code-body"><pre><code><kw>try</kw> {
+    ledger.debit(account, amount);
+} <kw>catch</kw> (<ty>PaymentException</ty> e) {
+<span class="hl">    <cm>// retry later</cm>
+</span>}</code></pre></div>
+      </div>
+
+      <div class="fix-block">
+        <div class="fix-label">How to fix</div>
+        <p class="fix-text">
+          Log the exception with <code>logger.error("…", e)</code> before returning, or rethrow it so the
+          caller can handle it. If swallowing is intentional (e.g., best-effort cleanup), add a suppression
+          comment with a reason: <code>// diagscope:ignore SILENT_CATCH -- best-effort post-response cleanup</code>
+        </p>
+      </div>
+    </div>
+  </article>
+
+  <!-- 2 · FUTURE_GET_WITHOUT_TIMEOUT -->
+  <article class="finding" data-sev="error">
+    <div class="finding-body">
+      <div class="finding-header">
+        <span class="sev-pill error">Error</span>
+        <span class="rule-id mono">FUTURE_GET_WITHOUT_TIMEOUT</span>
+        <span class="file-loc mono">ReportService.java:83</span>
+        <span class="confidence">HIGH confidence</span>
+      </div>
+      <p class="finding-message">
+        <code>CompletableFuture.get()</code> blocks the calling thread indefinitely. If the background
+        task hangs or the thread pool is saturated, this request will never complete and the connection
+        will eventually time out on the client side without any useful diagnostic.
+      </p>
+
+      <div class="flow-block">
+        <div class="flow-label">Flow path</div>
+        <div class="flow-chain">
+          <span class="flow-step entrypoint">GET /reports/{id}</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">ReportController.download()</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step issue">ReportService.generate()</span>
+        </div>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-header-bar">ReportService.java · lines 81–84</div>
+        <div class="code-body"><pre><code><ty>CompletableFuture</ty>&lt;<ty>Report</ty>&gt; future = reportBuilder.buildAsync(id);
+<span class="hl"><kw>return</kw> future.get(); <cm>// no timeout — blocks indefinitely</cm>
+</span></code></pre></div>
+      </div>
+
+      <div class="fix-block">
+        <div class="fix-label">How to fix</div>
+        <p class="fix-text">
+          Replace with <code>future.get(30, TimeUnit.SECONDS)</code> and catch <code>TimeoutException</code>
+          to return a structured error. For reactive code, prefer <code>.orTimeout(30, SECONDS)</code>
+          on the <code>CompletableFuture</code>.
+        </p>
+      </div>
+    </div>
+  </article>
+
+  <!-- 3 · MISSING_TRANSACTION_ANNOTATION -->
+  <article class="finding" data-sev="warning">
+    <div class="finding-body">
+      <div class="finding-header">
+        <span class="sev-pill warning">Warning</span>
+        <span class="rule-id mono">MISSING_TRANSACTION_ANNOTATION</span>
+        <span class="file-loc mono">OrderService.java:31</span>
+        <span class="confidence">MEDIUM confidence</span>
+      </div>
+      <p class="finding-message">
+        Write operation <code>save()</code> on <code>orderRepository</code> is not inside a
+        <code>@Transactional</code> boundary. If <code>inventoryRepository.reserve()</code> fails
+        afterward, the order row will be orphaned with no rollback possible.
+      </p>
+
+      <div class="flow-block">
+        <div class="flow-label">Flow path</div>
+        <div class="flow-chain">
+          <span class="flow-step entrypoint">POST /orders</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">OrderController.create()</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step issue">OrderService.createOrder()</span>
+        </div>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-header-bar">OrderService.java · lines 29–35</div>
+        <div class="code-body"><pre><code><kw>public</kw> <ty>Order</ty> createOrder(<ty>OrderRequest</ty> req) {
+<span class="hl-warn">    <ty>Order</ty> order = orderRepository.save(<kw>new</kw> <ty>Order</ty>(req));
+    inventoryRepository.reserve(req.items()); <cm>// partial write if this throws</cm>
+</span>    <kw>return</kw> order;
+}</code></pre></div>
+      </div>
+
+      <div class="fix-block">
+        <div class="fix-label">How to fix</div>
+        <p class="fix-text">
+          Annotate <code>createOrder()</code> with <code>@Transactional</code> so both
+          writes commit or roll back as a unit.
+        </p>
+      </div>
+    </div>
+  </article>
+
+  <!-- 4 · HTTP_TIMEOUT_NOT_SET -->
+  <article class="finding" data-sev="warning">
+    <div class="finding-body">
+      <div class="finding-header">
+        <span class="sev-pill warning">Warning</span>
+        <span class="rule-id mono">HTTP_TIMEOUT_NOT_SET</span>
+        <span class="file-loc mono">NotificationService.java:22</span>
+        <span class="confidence">MEDIUM confidence</span>
+      </div>
+      <p class="finding-message">
+        HTTP call <code>block()</code> on <code>response</code> has no timeout. A slow or
+        unreachable notification endpoint will hold a thread indefinitely; under concurrent load
+        this exhausts the thread pool and cascades into a service-wide outage.
+      </p>
+
+      <div class="flow-block">
+        <div class="flow-label">Flow path</div>
+        <div class="flow-chain">
+          <span class="flow-step entrypoint">POST /orders</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">OrderController.create()</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">OrderService.createOrder()</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step issue">NotificationService.notify()</span>
+        </div>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-header-bar">NotificationService.java · lines 20–23</div>
+        <div class="code-body"><pre><code><ty>Mono</ty>&lt;<ty>Response</ty>&gt; response = webClient.get(alertUrl);
+<span class="hl-warn"><kw>return</kw> response.block(); <cm>// waits forever if service is down</cm>
+</span></code></pre></div>
+      </div>
+
+      <div class="fix-block">
+        <div class="fix-label">How to fix</div>
+        <p class="fix-text">
+          Add <code>.timeout(Duration.ofSeconds(5))</code> before <code>.block()</code>,
+          or set <code>responseTimeout</code> on the <code>WebClient</code> builder so all
+          calls from this client inherit the limit.
+        </p>
+      </div>
+    </div>
+  </article>
+
+  <!-- 5 · N_PLUS_ONE_QUERY_RISK -->
+  <article class="finding" data-sev="warning">
+    <div class="finding-body">
+      <div class="finding-header">
+        <span class="sev-pill warning">Warning</span>
+        <span class="rule-id mono">N_PLUS_ONE_QUERY_RISK</span>
+        <span class="file-loc mono">OrderService.java:61</span>
+        <span class="confidence">MEDIUM confidence</span>
+      </div>
+      <p class="finding-message">
+        Repository call <code>findByOrder()</code> is inside a loop — one query per
+        iteration. For a list of 100 orders this issues 101 database roundtrips where a
+        single JOIN or batch fetch would do.
+      </p>
+
+      <div class="flow-block">
+        <div class="flow-label">Flow path</div>
+        <div class="flow-chain">
+          <span class="flow-step entrypoint">GET /orders</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step">OrderController.list()</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-step issue">OrderService.listWithDetails()</span>
+        </div>
+      </div>
+
+      <div class="code-wrap">
+        <div class="code-header-bar">OrderService.java · lines 59–63</div>
+        <div class="code-body"><pre><code><kw>for</kw> (<ty>Order</ty> order : orders) {
+<span class="hl-warn">    <ty>List</ty>&lt;<ty>Item</ty>&gt; items = orderItems.findByOrder(order.id()); <cm>// N queries</cm>
+</span>    order.setItems(items);
+}</code></pre></div>
+      </div>
+
+      <div class="fix-block">
+        <div class="fix-label">How to fix</div>
+        <p class="fix-text">
+          Use <code>orderItems.findByOrderIdIn(orderIds)</code> to load all items in one
+          query, then associate them in memory with a <code>Map</code> grouping by order ID.
+          Or configure the JPA relationship with <code>fetch = FetchType.EAGER</code> and a
+          JOIN fetch in the parent query.
+        </p>
+      </div>
+    </div>
+  </article>
+
+  <!-- 6 · GOD_CLASS_DETECTED -->
+  <article class="finding" data-sev="info">
+    <div class="finding-body">
+      <div class="finding-header">
+        <span class="sev-pill info">Info</span>
+        <span class="rule-id mono">GOD_CLASS_DETECTED</span>
+        <span class="file-loc mono">PaymentOrchestrator.java</span>
+        <span class="confidence">HIGH confidence</span>
+      </div>
+      <p class="finding-message">
+        Class <code>PaymentOrchestrator</code> has <strong>17 public methods</strong>
+        (max recommended: 15). Classes with this many responsibilities accumulate dependencies
+        over time and become difficult to test or modify in isolation.
+      </p>
+
+      <p class="no-flow-note">Project-level rule — not tied to a specific entrypoint flow.</p>
+
+      <div class="fix-block">
+        <div class="fix-label">How to fix</div>
+        <p class="fix-text">
+          Group related methods into cohesive collaborators: a <code>PaymentRouter</code> for
+          routing logic, a <code>PaymentAuditService</code> for audit/logging concerns, and a
+          <code>RefundCoordinator</code> for reversal flows. Each resulting class will be
+          independently testable with a focused set of dependencies.
+        </p>
+      </div>
+    </div>
+  </article>
+
+</main>
+
+<footer>
+  diagscope · payment-service · 25 Aug 2026 · 6 findings in 312 ms
+</footer>
+
+<script>
+  const btns = document.querySelectorAll('.filter-btn');
+  const cards = document.querySelectorAll('.finding');
+
+  function filter(sev) {
+    btns.forEach(b => b.classList.remove('active'));
+    document.querySelector(`.filter-btn.${sev === 'all' ? 'all' : sev + '-btn'}`).classList.add('active');
+    cards.forEach(c => {
+      c.classList.toggle('hidden', sev !== 'all' && c.dataset.sev !== sev);
+    });
+  }
+</script>
