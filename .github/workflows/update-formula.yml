@@ -19,7 +19,7 @@ jobs:
           VERSION: ${{ github.event.client_payload.version }}
           SHA256:  ${{ github.event.client_payload.sha256 }}
         run: |
-          NEW_URL="https://github.com/DiagScope/diagscope/releases/download/v${VERSION}/diagscope-${VERSION}.jar"
+          NEW_URL="https://github.com/DiagScope/releases/releases/download/v${VERSION}/diagscope-${VERSION}.jar"
           sed -i \
             -e "s|url \"[^\"]*\"|url \"${NEW_URL}\"|" \
             -e "s/sha256 \"[^\"]*\"/sha256 \"${SHA256}\"/" \
