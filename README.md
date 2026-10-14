@@ -7,109 +7,263 @@ endpoints, Kafka consumers, scheduled jobs, reactive handlers, and plain public 
 reports code that silently destroys diagnostic evidence before it can reach your logs.
 
 It does not style-check your code. Every finding is anchored to a specific entrypoint → method
-chain so you see *which production path* goes blind when something breaks. It never compiles or
-executes your project: it reads source files and reasons about structure.
+chain, so you see *which production path* goes blind when something breaks. It never compiles or
+executes your project: it only reads source files.
+
+🌐 **Website:** <https://diagscope.github.io> · 📄 **[Example report](https://diagscope.github.io/example-report.html)** (rendered, no install needed)
+
+This repository is the Homebrew tap. The analyzer itself lives in
+[DiagScope/diagscope](https://github.com/DiagScope/diagscope).
 
 ---
 
-## What it catches
+## Contents
 
-| Category | Example finding |
-|---|---|
-| **Exception handling** | Catch block swallows the exception — no log, no rethrow, no stable error code |
-| **Transactions** | `orderRepository.save()` without `@Transactional` — if the next write fails, the first cannot roll back |
-| **HTTP resilience** | `webClient.block()` without a timeout — a slow upstream holds the thread forever |
-| **Concurrency** | `future.get()` with no timeout; `HashMap` used where `ConcurrentHashMap` is needed |
-| **Observability** | MDC context not propagated into async tasks; metric tag with unbounded cardinality |
-| **Database** | JDBC connection opened but never closed; N+1 query inside a loop |
-| **AOP / Proxy** | `@Transactional` method called from the same class — Spring proxy is bypassed |
-| **Maintainability** | Class with 17 public methods; method with 7 parameters; excessive cyclomatic complexity |
-
-44 rules. Results in Markdown, HTML, JSON, and SARIF.
+- [Install](#install)
+- [Try it in 5 minutes](#try-it-in-5-minutes)
+- [Collecting the reports](#collecting-the-reports)
+- [Reading a report](#reading-a-report)
+- [Useful options](#useful-options)
+- [Using it in CI](#using-it-in-ci)
+- [Suppressing findings](#suppressing-findings)
+- [Troubleshooting](#troubleshooting)
+- [Privacy and security](#privacy-and-security)
+- [Update and uninstall](#update-and-uninstall)
 
 ---
 
 ## Install
+
+You need [Homebrew](https://brew.sh) (macOS or Linux). Java 25 is installed automatically as a
+dependency — there is nothing else to configure.
 
 ```bash
 brew tap DiagScope/tap
 brew install diagscope
 ```
 
-Java 25 is pulled in automatically as a dependency — nothing else to configure.
-
----
-
-## Quick start
+Check that it works:
 
 ```bash
-# Analyze a Spring / Quarkus / Micronaut project
+diagscope --version
+```
+
+---
+
+## Try it in 5 minutes
+
+Run these from any Java or Kotlin project (Maven or Gradle layout). No build step is required and
+nothing is compiled.
+
+**1. Check what DiagScope understands about the project** (optional, but the quickest way to spot
+a setup problem):
+
+```bash
+diagscope doctor --project /path/to/project
+```
+
+It lists the build system, the source roots, the languages found, and which framework rules will
+apply.
+
+**2. Scan it:**
+
+```bash
 diagscope scan --project /path/to/project
+```
 
-# Plain Java or Kotlin — no framework annotations needed
-diagscope scan --project /path/to/project --entrypoint PUBLIC_METHOD
+**3. Open the report:**
 
-# Only findings in files changed since the base branch — useful in CI
-diagscope scan --project . --changed-since origin/main --fail-on ERROR
+```bash
+open /path/to/project/target/diagscope/report.html        # macOS (Maven)
+xdg-open /path/to/project/build/diagscope/report.html     # Linux (Gradle)
+```
 
-# Understand a specific rule
+**4. Start with the top of the report.** *Fix these first* is ranked by severity, confidence and
+how many runtime flows the finding sits on. For any rule you do not recognise:
+
+```bash
 diagscope explain SILENT_CATCH
-
-# See all rules with severity and version
-diagscope rules
 ```
 
-Output lands in `target/diagscope/` (Maven) or `build/diagscope/` (Gradle):
+It prints what the rule means, why it matters, how it is detected, and what to do about it.
 
+**Plain library, or no framework annotations?** By default the entrypoints are REST endpoints,
+Kafka listeners, reactive messaging handlers and scheduled jobs. For anything else, treat every
+public method as an entrypoint:
+
+```bash
+diagscope scan --project /path/to/project --entrypoint PUBLIC_METHOD
 ```
-target/diagscope/
-├── report.md    ← for pull request review and terminal reading
-├── report.html  ← interactive, self-contained, no network required
-└── result.json  ← machine-readable for dashboards and automation
+
+`--entrypoint` replaces the default list, so for an application where you want both, name them all:
+`--entrypoint REST,KAFKA_LISTENER,REACTIVE_MESSAGE,SCHEDULED,PUBLIC_METHOD`.
+
+**Browse the rules.** The catalog grows with every release, so ask the tool instead of a document:
+
+```bash
+diagscope rules                  # every rule, with severity and version
+diagscope rules --format JSON    # the same, for scripts
 ```
 
 ---
 
-## Example report
+## Collecting the reports
 
-The HTML report is interactive — filter by severity, follow flow paths from entrypoint to the
-exact line with the problem, and read the fix guidance inline.
+Each scan writes its files to `target/diagscope/` (Maven) or `build/diagscope/` (Gradle), inside the
+analyzed project:
 
-→ **[View example report](docs/example-report.html)**
+| File | What it is for |
+|---|---|
+| `report.html` | Interactive and self-contained: open it in a browser, no network or server. Filter by severity and confidence, group by flow or file, and follow the call path to the exact line. |
+| `report.md` | Plain text for pull-request comments and terminal reading. |
+| `result.json` | Machine-readable result with a versioned schema, for dashboards, automation and comparing two runs. |
+| `result.sarif` | For GitHub code scanning and other SARIF viewers (add `--format SARIF`). |
+
+By default you get `report.md`, `report.html` and `result.json`. Pick the ones you want and where
+they go:
+
+```bash
+diagscope scan --project . --output ~/diagscope-reports/orders --format HTML,JSON,SARIF
+```
+
+An absolute `--output` is used as given; a relative one is resolved inside the project.
+
+### Several projects at once
+
+```bash
+for project in ~/work/orders ~/work/payments ~/work/catalog; do
+  diagscope scan --project "$project" \
+    --output "$HOME/diagscope-reports/$(basename "$project")" \
+    --format HTML,JSON
+done
+```
+
+You end up with one folder per project, each with its own `report.html` and `result.json`.
+
+### Comparing two runs
+
+Keep the `result.json` of a scan, change the code, scan again, then:
+
+```bash
+diagscope trend --base before/result.json --current after/result.json
+```
+
+It lists the findings that are new, fixed, and still there. Add `--format JSON` for a
+machine-readable answer, or `-o trend.md` to write it to a file.
+
+### Sharing a report
+
+A report is a single file you can attach to a ticket or an email. Keep in mind that it contains
+**source snippets and file paths from your project**, so share it only where you would share the
+code itself.
 
 ---
 
-## How it works
+## Reading a report
 
-1. **Parse** — reads all `.java` and `.kt` files and extracts structural facts (method calls,
-   catch blocks, annotations, loops) into a language-neutral model. No compilation needed.
+Every finding shows:
 
-2. **Build flows** — for each entrypoint it follows the call graph up to a configurable depth
-   and collects all reachable methods into a *flow*. A flow represents one real execution path
-   from the edge of the system inward.
+- the **rule** and its **severity** — `ERROR`, `WARNING` or `INFO`;
+- the **confidence** — `HIGH`, `MEDIUM` or `LOW`. A finding is never more confident than the path
+  that leads to it, so triage `HIGH` first;
+- the **file and line**, with a code snippet;
+- the **flow** — the entrypoint and the chain of calls that reaches the problem, e.g.
+  `POST /payments/{id}/capture → PaymentService.capture → PaymentMetrics.record`;
+- why it matters and how to fix it.
 
-3. **Run rules** — each rule inspects every method in every flow. Findings are never more
-   confident than the path that leads to them: ambiguous resolution and depth truncation are
-   reported as *flow boundaries* so you know exactly what was and was not analyzed.
+Where DiagScope could not follow a call (ambiguous target, external library, depth limit) it says
+so as a *flow boundary* instead of guessing. That tells you what was **not** analyzed.
+
+A scan that finds nothing does not prove the code is clean: it means none of the rules matched on
+the paths DiagScope could follow.
 
 ---
 
-## Suppress a finding
+## Useful options
+
+| Option | What it does |
+|---|---|
+| `--project`, `-p` | Project directory (required). |
+| `--output`, `-o` | Where to write the reports. |
+| `--format` | Any of `MARKDOWN`, `JSON`, `HTML`, `SARIF`, comma-separated. |
+| `--entrypoint` | Comma-separated subset of `REST`, `KAFKA_LISTENER`, `REACTIVE_MESSAGE`, `SCHEDULED`, plus `PUBLIC_METHOD` for plain code. |
+| `--max-depth` | How deep to follow calls from each entrypoint (0–32, default 3). |
+| `--fail-on` | Exit with code 1 when a finding of this severity or higher exists: `ERROR`, `WARNING`, `INFO`. |
+| `--changed-since <ref>` | Only report findings in files changed since a git ref, such as `origin/main`. |
+| `--baseline` / `--update-baseline` | Ignore the findings you already have, and gate only new ones. |
+| `--classpath` | Dependency JARs, to improve how Java symbols are resolved. |
+| `--source-root` | Extra source directories for non-standard layouts. |
+| `--config` | A `diagscope.yml` policy: disable rules, override severities, ignore paths. |
+
+Exit codes: `0` success · `1` a finding met `--fail-on` · `2` invalid configuration or scanner
+failure · `3` unsupported project structure. Without `--fail-on`, exit code `0` does **not** mean
+"no findings".
+
+The full reference is in the
+[CLI documentation](https://github.com/DiagScope/diagscope/blob/main/docs/CLI.md).
+
+---
+
+## Using it in CI
+
+Fail the build only on findings introduced by the current change:
+
+```bash
+# once, on the main branch: record what exists today
+diagscope scan --project . --update-baseline
+
+# on every pull request: gate only new findings
+diagscope scan --project . --baseline --fail-on ERROR
+```
+
+Or look only at the files a pull request touches:
+
+```bash
+diagscope scan --project . --changed-since origin/main --fail-on ERROR
+```
+
+Keep the reports as build artifacts, for example on GitHub Actions:
+
+```yaml
+- run: diagscope scan --project . --format HTML,JSON,SARIF --fail-on ERROR
+- uses: actions/upload-artifact@v4
+  if: always()
+  with:
+    name: diagscope
+    path: target/diagscope/
+```
+
+DiagScope also ships a ready-made GitHub Action; see the
+[CI guide](https://github.com/DiagScope/diagscope/blob/main/docs/CI.md).
+
+---
+
+## Suppressing findings
+
+When a finding is intentional, say why — vague comments and plain `// TODO` lines are not accepted:
 
 ```java
 catch (CleanupException ignored) {
-    // diagscope:ignore SILENT_CATCH -- best-effort cleanup after response was committed
+    // diagscope:ignore SILENT_CATCH -- best-effort cleanup after the response was committed
 }
 ```
 
-Vague comments and plain `// TODO` lines are not accepted as suppressions. The reason is required.
+For many pre-existing findings at once, record a baseline (see [Using it in CI](#using-it-in-ci)).
 
-For bulk suppression of pre-existing findings, record a baseline:
+---
 
-```bash
-diagscope scan --project . --update-baseline   # snapshot current state
-diagscope scan --project . --baseline --fail-on ERROR  # gate only new findings
-```
+## Troubleshooting
+
+| Symptom | What to try |
+|---|---|
+| `0 flows` or very few findings | No entrypoint was recognised. Run `diagscope doctor`, and for plain code add `--entrypoint PUBLIC_METHOD`. |
+| Exit code `3` | The project layout is not a conventional Maven or Gradle one. Point `--project` at the module root, or add `--source-root`. |
+| Calls into your own libraries show as flow boundaries | Pass the dependency JARs with `--classpath`. |
+| `command not found: diagscope` | `brew install diagscope`, then open a new terminal. |
+| An old version after an update | `brew update && brew upgrade diagscope`, and check with `diagscope --version`. |
+| A finding you disagree with | Read `diagscope explain <RULE_ID>`, suppress it with a reason if it is intentional, and tell us — a false positive is a bug in the rule. |
+
+Questions and bug reports: [DiagScope/diagscope issues](https://github.com/DiagScope/diagscope/issues).
 
 ---
 
@@ -117,30 +271,29 @@ diagscope scan --project . --baseline --fail-on ERROR  # gate only new findings
 
 DiagScope is designed to be safe to run on proprietary and company codebases.
 
-**Your code never leaves your machine.** DiagScope reads source files from the path you
-specify and writes results to a local output directory. It makes no network requests during
-analysis — there are no telemetry calls, no licence checks, no cloud backends.
+**Your code never leaves your machine.** DiagScope reads source files from the path you specify and
+writes results to a local output directory. It makes no network requests during analysis — there
+are no telemetry calls, no licence checks, no cloud backends.
 
-**Nothing is collected or transmitted.** DiagScope has no analytics, no crash reporting, and
-no update pings. It does not know you ran it, what project you analyzed, or what it found.
+**Nothing is collected or transmitted.** There is no analytics, no crash reporting and no update
+ping. It does not know you ran it, what project you analyzed, or what it found.
 
-**No code is executed or compiled.** The tool reads `.java` and `.kt` source files and reasons
-about their structure. It never invokes `javac`, runs your tests, or loads your application's
-classes. Your build system and runtime dependencies are not touched.
+**No code is executed or compiled.** It reads `.java` and `.kt` files and reasons about their
+structure. It never invokes `javac`, runs your tests, or loads your application's classes.
 
-**Results stay where you put them.** The output files (`report.md`, `report.html`,
-`result.json`) are written to your local filesystem. Nothing is uploaded or shared unless you
-choose to share them yourself.
+**Results stay where you put them.** `report.html`, `report.md`, `result.json` and `result.sarif`
+are written to your local filesystem, and nothing is uploaded unless you share them yourself.
 
 **You can verify this.** DiagScope is a self-contained JAR. Tools like
-[`Wireshark`](https://www.wireshark.org) or `sudo lsof -i -p <pid>` can confirm that no
-network connections are opened while it runs. The source is available to authorised team
-members on request.
+[Wireshark](https://www.wireshark.org) or `sudo lsof -i -p <pid>` can confirm that no network
+connections are opened while it runs.
 
 ---
 
-## Update
+## Update and uninstall
 
 ```bash
-brew update && brew upgrade diagscope
+brew update && brew upgrade diagscope     # update
+brew uninstall diagscope                  # remove
+brew untap DiagScope/tap                  # remove the tap as well
 ```
