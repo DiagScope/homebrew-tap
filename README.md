@@ -24,7 +24,9 @@ This repository is the Homebrew tap. The analyzer itself lives in
 - [Collecting the reports](#collecting-the-reports)
 - [Reading a report](#reading-a-report)
 - [Useful options](#useful-options)
+- [Setting the tolerance: the gate](#setting-the-tolerance-the-gate)
 - [Using it in CI](#using-it-in-ci)
+- [Using it with AI coding assistants](#using-it-with-ai-coding-assistants)
 - [Suppressing findings](#suppressing-findings)
 - [Troubleshooting](#troubleshooting)
 - [Privacy and security](#privacy-and-security)
@@ -185,22 +187,56 @@ the paths DiagScope could follow.
 |---|---|
 | `--project`, `-p` | Project directory (required). |
 | `--output`, `-o` | Where to write the reports. |
-| `--format` | Any of `MARKDOWN`, `JSON`, `HTML`, `SARIF`, comma-separated. |
+| `--format` | Any of `MARKDOWN`, `JSON`, `HTML`, `SARIF`, `AGENT`, comma-separated. `AGENT` alone prints compact text to the terminal. |
 | `--entrypoint` | Comma-separated subset of `REST`, `KAFKA_LISTENER`, `REACTIVE_MESSAGE`, `SCHEDULED`, plus `PUBLIC_METHOD` for plain code. |
 | `--max-depth` | How deep to follow calls from each entrypoint (0–32, default 3). |
-| `--fail-on` | Exit with code 1 when a finding of this severity or higher exists: `ERROR`, `WARNING`, `INFO`. |
+| `--fail-on` | Exit with code 1 when a finding of this severity or higher exists: `ERROR`, `WARNING`, `INFO`. Overrides the `gate:` of `diagscope.yml`. |
+| `--gate-profile` | Use a named profile from the `gate:` section of `diagscope.yml`. |
+| `--files` | Only report findings in these files (comma-separated). The whole project is still analyzed. |
 | `--changed-since <ref>` | Only report findings in files changed since a git ref, such as `origin/main`. |
 | `--baseline` / `--update-baseline` | Ignore the findings you already have, and gate only new ones. |
 | `--classpath` | Dependency JARs, to improve how Java symbols are resolved. |
 | `--source-root` | Extra source directories for non-standard layouts. |
 | `--config` | A `diagscope.yml` policy: disable rules, override severities, ignore paths. |
 
-Exit codes: `0` success · `1` a finding met `--fail-on` · `2` invalid configuration or scanner
-failure · `3` unsupported project structure. Without `--fail-on`, exit code `0` does **not** mean
+Exit codes: `0` success · `1` the gate failed (`--fail-on` or `gate:`) · `2` invalid configuration or scanner
+failure · `3` unsupported project structure. Without `--fail-on` or a `gate:`, exit code `0` does **not** mean
 "no findings".
 
 The full reference is in the
 [CLI documentation](https://github.com/DiagScope/diagscope/blob/main/docs/CLI.md).
+
+---
+
+## Setting the tolerance: the gate
+
+`--fail-on ERROR` is the simplest gate. When it is too blunt, describe the tolerance in `diagscope.yml`, so
+it is versioned and reviewed with the code:
+
+```yaml
+schemaVersion: "1.0"
+gate:
+  failOn:                       # a finding breaks the build when it matches ANY entry
+    - severity: ERROR
+      confidence: HIGH          # minimums; default confidence is LOW
+    - severity: INFO
+      rules: [SILENT_CATCH]     # optional: only these rules
+  maxFindings:                  # tolerate up to N visible findings of a severity
+    WARNING: 20
+  profiles:                     # alternatives that replace the gate, chosen with --gate-profile
+    release:
+      failOn:
+        - severity: WARNING
+```
+
+```bash
+diagscope scan --project .                          # the default gate
+diagscope scan --project . --gate-profile release   # a stricter one for release branches
+```
+
+A failing gate prints every breached condition with its count. The gate judges the findings left after the
+baseline, waivers and `--changed-since`, so on a project with a baseline it only judges what is new. An explicit
+`--fail-on` always wins. Details: [CONFIGURATION.md](https://github.com/DiagScope/diagscope/blob/main/docs/CONFIGURATION.md#gate).
 
 ---
 
@@ -238,6 +274,44 @@ DiagScope also ships a ready-made GitHub Action; see the
 
 ---
 
+## Using it with AI coding assistants
+
+When a team generates code with an assistant, run DiagScope before the assistant declares the work done. Set it
+up once per project:
+
+```bash
+diagscope init-agent --project .
+```
+
+It only adds, and it is safe to run again:
+
+- a marked block in `AGENTS.md` (read by most assistants) and `CLAUDE.md` telling the assistant to run
+  `diagscope scan --format AGENT --files <changed files>` before finishing, to fix the cause, and not to add
+  `diagscope:ignore` comments, waivers, baseline entries or overrides without asking you;
+- for Claude Code, a `Stop` hook (`.claude/hooks/diagscope-stop.sh`) that scans the changed Java and Kotlin files
+  when a task ends and hands the findings back once, plus its registration in `.claude/settings.json`. Your other
+  settings are kept.
+
+`--format AGENT` is plain text made to be read by a model: the worst finding first, one `fix:` line each, at
+most 30, about 3 KB where the Markdown report is 22 KB.
+
+```text
+ERROR HIGH SILENT_CATCH src/main/java/example/PaymentListener.java:6
+  Exception is caught and ignored.
+  fix: Log, propagate, preserve the cause, ...
+```
+
+What to expect, honestly:
+
+- The automatic hook exists for Claude Code only. Other assistants read `AGENTS.md` and may run the command, but
+  nothing forces them to.
+- A scan costs 1 to 15 seconds whatever the number of changed files, because the whole project is analyzed. That is
+  why the check runs once at the end of a task and not after every edit.
+- An assistant told to fix findings may "fix" a false positive. Use a gate with `confidence: HIGH` for assistants
+  (define a profile for it in `diagscope.yml`, then `diagscope init-agent --gate-profile assistant`) and read what they change.
+
+---
+
 ## Suppressing findings
 
 When a finding is intentional, say why — vague comments and plain `// TODO` lines are not accepted:
@@ -248,7 +322,9 @@ catch (CleanupException ignored) {
 }
 ```
 
-For many pre-existing findings at once, record a baseline (see [Using it in CI](#using-it-in-ci)).
+For many pre-existing findings at once, record a baseline (see [Using it in CI](#using-it-in-ci)). For a reviewed
+per-finding decision, add a waiver to `diagscope.yml` with a reason and an optional expiry date
+([details](https://github.com/DiagScope/diagscope/blob/main/docs/CONFIGURATION.md#reviewed-waivers)).
 
 ---
 
