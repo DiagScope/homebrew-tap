@@ -191,6 +191,7 @@ the paths DiagScope could follow.
 | `--entrypoint` | Comma-separated subset of `REST`, `KAFKA_LISTENER`, `REACTIVE_MESSAGE`, `SCHEDULED`, plus `PUBLIC_METHOD` for plain code. |
 | `--max-depth` | How deep to follow calls from each entrypoint (0–32, default 3). |
 | `--fail-on` | Exit with code 1 when a finding of this severity or higher exists: `ERROR`, `WARNING`, `INFO`. Overrides the `gate:` of `diagscope.yml`. |
+| `--fail-on-confidence` | With `--fail-on`, only findings of at least this confidence (`LOW`, `MEDIUM`, `HIGH`) count. |
 | `--gate-profile` | Use a named profile from the `gate:` section of `diagscope.yml`. |
 | `--files` | Only report findings in these files (comma-separated). The whole project is still analyzed. |
 | `--changed-since <ref>` | Only report findings in files changed since a git ref, such as `origin/main`. |
@@ -309,8 +310,10 @@ What to expect, honestly:
   all. The generated instructions and hook include it.
 - A scan costs 1 to 15 seconds whatever the number of changed files, because the whole project is analyzed. That is
   why the check runs once at the end of a task and not after every edit.
-- An assistant told to fix findings may "fix" a false positive. Use a gate with `confidence: HIGH` for assistants
-  (define a profile for it in `diagscope.yml`, then `diagscope init-agent --gate-profile assistant`) and read what they change.
+- An assistant told to fix findings may "fix" a false positive, so the hook only blocks on ERROR findings of `HIGH`
+  confidence (and honours `diagscope-baseline.json` when it exists, so legacy findings in a file it touched do not
+  block it). To change that, define a profile in `diagscope.yml` and run
+  `diagscope init-agent --gate-profile assistant`. Read what an assistant changes in response anyway.
 
 ---
 
