@@ -1,9 +1,9 @@
 class Diagscope < Formula
   desc "Static analyzer for Java/Kotlin projects — finds code that goes blind when things break"
   homepage "https://github.com/DiagScope/diagscope"
-  url "https://github.com/DiagScope/releases/releases/download/v0.1.2/diagscope-0.1.2.jar"
-  sha256 "ec4def1017da7157ce551d94f77174c3d0a826dfb37ea63423f6bc158d808538"
-  version "0.1.2"
+  url "https://github.com/DiagScope/releases/releases/download/v0.1.3/diagscope-0.1.3.jar"
+  sha256 "c3d72dd5e2aaa249dd688ac52214939580033494242cc180c9d813a5abd02703"
+  version "0.1.3"
   license "Apache-2.0"
 
   depends_on "openjdk@25"
