@@ -286,7 +286,7 @@ diagscope init-agent --project .
 It only adds, and it is safe to run again:
 
 - a marked block in `AGENTS.md` (read by most assistants) and `CLAUDE.md` telling the assistant to run
-  `diagscope scan --format AGENT --files <changed files>` before finishing, to fix the cause, and not to add
+  `diagscope scan --format AGENT --entrypoint ...,PUBLIC_METHOD --files <changed files>` before finishing, to fix the cause, and not to add
   `diagscope:ignore` comments, waivers, baseline entries or overrides without asking you;
 - for Claude Code, a `Stop` hook (`.claude/hooks/diagscope-stop.sh`) that scans the changed Java and Kotlin files
   when a task ends and hands the findings back once, plus its registration in `.claude/settings.json`. Your other
@@ -305,6 +305,8 @@ What to expect, honestly:
 
 - The automatic hook exists for Claude Code only. Other assistants read `AGENTS.md` and may run the command, but
   nothing forces them to.
+- Without `PUBLIC_METHOD` among the entrypoints, code that no endpoint, listener or job reaches is not checked at
+  all. The generated instructions and hook include it.
 - A scan costs 1 to 15 seconds whatever the number of changed files, because the whole project is analyzed. That is
   why the check runs once at the end of a task and not after every edit.
 - An assistant told to fix findings may "fix" a false positive. Use a gate with `confidence: HIGH` for assistants
