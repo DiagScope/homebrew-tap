@@ -285,7 +285,7 @@ tolerance in `diagscope.yml` governs the CLI, CI and the build alike. It is on M
 <plugin>
   <groupId>io.github.diagscope</groupId>
   <artifactId>diagscope-maven-plugin</artifactId>
-  <version>0.1.6</version>
+  <version>0.1.7</version>
   <executions>
     <execution>
       <goals><goal>scan</goal></goals>   <!-- bound to the verify phase -->
@@ -305,7 +305,7 @@ mvn verify -Ddiagscope.gateProfile=release          # a profile of the gate: sec
 Or run it once, without editing the POM:
 
 ```bash
-mvn io.github.diagscope:diagscope-maven-plugin:0.1.6:scan -Ddiagscope.failOn=ERROR
+mvn io.github.diagscope:diagscope-maven-plugin:0.1.7:scan -Ddiagscope.failOn=ERROR
 ```
 
 Good to know:
