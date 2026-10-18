@@ -37,7 +37,7 @@ This repository is the Homebrew tap. The analyzer itself lives in
 
 ## Install
 
-You need [Homebrew](https://brew.sh) (macOS or Linux). Java 25 is installed automatically as a
+You need [Homebrew](https://brew.sh) (macOS or Linux). Java 17 is installed automatically as a
 dependency — there is nothing else to configure.
 
 ```bash
@@ -285,13 +285,13 @@ tolerance in `diagscope.yml` governs both:
 <plugin>
   <groupId>dev.diagscope</groupId>
   <artifactId>diagscope-maven-plugin</artifactId>
-  <version>0.1.4</version>
+  <version>0.1.5</version>
   <executions><execution><goals><goal>scan</goal></goals></execution></executions>
 </plugin>
 ```
 
 It is **not published to Maven Central yet**: for now build it from the source repository or deploy it to your own
-repository, and run Maven on JDK 25. Parameters and behaviour:
+repository, and run Maven on JDK 17 or newer. Parameters and behaviour:
 [MAVEN_PLUGIN.md](https://github.com/DiagScope/diagscope/blob/main/docs/MAVEN_PLUGIN.md).
 
 ---

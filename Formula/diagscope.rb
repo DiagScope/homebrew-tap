@@ -6,12 +6,12 @@ class Diagscope < Formula
   version "0.1.5"
   license "Apache-2.0"
 
-  depends_on "openjdk@25"
+  depends_on "openjdk@17"
 
   def install
     libexec.install "diagscope-#{version}.jar"
     bin.write_jar_script libexec/"diagscope-#{version}.jar", "diagscope",
-                         java_version: "25"
+                         java_version: "17"
   end
 
   test do
