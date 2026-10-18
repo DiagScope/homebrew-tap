@@ -26,12 +26,19 @@ jobs:
             -e "s/version \"[^\"]*\"/version \"${VERSION}\"/" \
             Formula/diagscope.rb
 
+      # The README shows the Maven plugin with a concrete version; keep it on the newest.
+      - name: Update the README examples
+        env:
+          VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          perl -0pi -e 's#(<artifactId>diagscope-maven-plugin</artifactId>\s*<version>)[^<]+(</version>)#$1$ENV{VERSION}$2#g; s#(diagscope-maven-plugin:)\d[^:\s]*(:scan)#$1$ENV{VERSION}$2#g' README.md
+
       - name: Commit and push
         env:
           VERSION: ${{ github.event.client_payload.version }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/diagscope.rb
+          git add Formula/diagscope.rb README.md
           git commit -m "chore: bump diagscope to ${VERSION}"
           git push
