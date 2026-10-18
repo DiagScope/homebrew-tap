@@ -26,6 +26,7 @@ This repository is the Homebrew tap. The analyzer itself lives in
 - [Useful options](#useful-options)
 - [Setting the tolerance: the gate](#setting-the-tolerance-the-gate)
 - [Using it in CI](#using-it-in-ci)
+- [Using it in a Maven build](#using-it-in-a-maven-build)
 - [Using it with AI coding assistants](#using-it-with-ai-coding-assistants)
 - [Suppressing findings](#suppressing-findings)
 - [Troubleshooting](#troubleshooting)
@@ -272,6 +273,26 @@ Keep the reports as build artifacts, for example on GitHub Actions:
 
 DiagScope also ships a ready-made GitHub Action; see the
 [CI guide](https://github.com/DiagScope/diagscope/blob/main/docs/CI.md).
+
+---
+
+## Using it in a Maven build
+
+A Maven plugin runs the scan during `mvn verify` and fails the build with the same gate as the command line, so the
+tolerance in `diagscope.yml` governs both:
+
+```xml
+<plugin>
+  <groupId>dev.diagscope</groupId>
+  <artifactId>diagscope-maven-plugin</artifactId>
+  <version>0.1.4</version>
+  <executions><execution><goals><goal>scan</goal></goals></execution></executions>
+</plugin>
+```
+
+It is **not published to Maven Central yet**: for now build it from the source repository or deploy it to your own
+repository, and run Maven on JDK 25. Parameters and behaviour:
+[MAVEN_PLUGIN.md](https://github.com/DiagScope/diagscope/blob/main/docs/MAVEN_PLUGIN.md).
 
 ---
 
