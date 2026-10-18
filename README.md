@@ -278,20 +278,48 @@ DiagScope also ships a ready-made GitHub Action; see the
 
 ## Using it in a Maven build
 
-A Maven plugin runs the scan during `mvn verify` and fails the build with the same gate as the command line, so the
-tolerance in `diagscope.yml` governs both:
+The Maven plugin runs the scan during `mvn verify` and fails the build with the same gate as the command line, so the
+tolerance in `diagscope.yml` governs the CLI, CI and the build alike. It is on Maven Central: no repository to add.
 
 ```xml
 <plugin>
-  <groupId>dev.diagscope</groupId>
+  <groupId>io.github.diagscope</groupId>
   <artifactId>diagscope-maven-plugin</artifactId>
-  <version>0.1.5</version>
-  <executions><execution><goals><goal>scan</goal></goals></execution></executions>
+  <version>0.1.6</version>
+  <executions>
+    <execution>
+      <goals><goal>scan</goal></goals>   <!-- bound to the verify phase -->
+    </execution>
+  </executions>
 </plugin>
 ```
 
-It is **not published to Maven Central yet**: for now build it from the source repository or deploy it to your own
-repository, and run Maven on JDK 17 or newer. Parameters and behaviour:
+With no gate configured the scan only reports (to `target/diagscope`). To break the build, either set the tolerance in
+`diagscope.yml` (see [the gate](#setting-the-tolerance-the-gate)) or pass it on the command line:
+
+```bash
+mvn verify -Ddiagscope.failOn=ERROR -Ddiagscope.failOnConfidence=HIGH
+mvn verify -Ddiagscope.gateProfile=release          # a profile of the gate: section
+```
+
+Or run it once, without editing the POM:
+
+```bash
+mvn io.github.diagscope:diagscope-maven-plugin:0.1.6:scan -Ddiagscope.failOn=ERROR
+```
+
+Good to know:
+
+- **Maven runs on JDK 17 or newer.** Nothing else to install: the analyzer comes with the plugin (one download of about
+  78 MB, cached afterwards).
+- **It runs per module.** In a multi-module build each module is judged on its own, `pom` modules are skipped, and one
+  `diagscope.yml` at the repository root governs them all.
+- **Libraries and code no endpoint reaches:** add `-Ddiagscope.entrypoints=REST,KAFKA_LISTENER,REACTIVE_MESSAGE,SCHEDULED,PUBLIC_METHOD`
+  (or the `entrypoints` parameter), as with `--entrypoint PUBLIC_METHOD` on the command line.
+- **Legacy code:** record a baseline with the CLI and point `-Ddiagscope.baseline=diagscope-baseline.json` at it, so the
+  build judges only new findings.
+
+All parameters and the details:
 [MAVEN_PLUGIN.md](https://github.com/DiagScope/diagscope/blob/main/docs/MAVEN_PLUGIN.md).
 
 ---
